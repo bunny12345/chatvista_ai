@@ -4,3 +4,4 @@ numpy==1.23.5
 langchain
 langchain-community
 langchain-aws
+unstructured
