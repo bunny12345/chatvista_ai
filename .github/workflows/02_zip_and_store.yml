@@ -1,0 +1,24 @@
+name: 02 - Zip and Store FAISS Index
+
+on:
+  workflow_dispatch:
+
+jobs:
+  zip_faiss_index:
+    name: Zip FAISS Index and Store
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run zip script with Ansible
+        run: |
+          ansible-playbook ansible/zip_faiss.yml
