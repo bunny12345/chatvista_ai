@@ -1,4 +1,4 @@
-name: Push Docker Image to ECR
+name:  Docker_Image_&_push_ECR
 
 on:
   workflow_dispatch:
