@@ -1,0 +1,19 @@
+- name: Deploy Lambda function
+  hosts: localhost
+  vars:
+    aws_region: eu-west-1
+    lambda_name: chatbot-lambda
+    ecr_repo: chatbot-lambda
+    aws_account_id: 9318
+    lambda_role_arn: arn:aws:iam::9318:role/Lambda_functionto_call_all_for_chatbot
+  tasks:
+    - name: Deploy or update Lambda
+      shell: |
+        aws lambda create-function \
+          --function-name {{ lambda_name }} \
+          --package-type Image \
+          --code ImageUri={{ aws_account_id }}.dkr.ecr.{{ aws_region }}.amazonaws.com/{{ ecr_repo }}:latest \
+          --role {{ lambda_role_arn }} || \
+        aws lambda update-function-code \
+          --function-name {{ lambda_name }} \
+          --image-uri {{ aws_account_id }}.dkr.ecr.{{ aws_region }}.amazonaws.com/{{ ecr_repo }}:latest
