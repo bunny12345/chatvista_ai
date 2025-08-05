@@ -5,3 +5,4 @@ langchain
 langchain-community
 langchain-aws
 unstructured
+unstructured[pdf]
