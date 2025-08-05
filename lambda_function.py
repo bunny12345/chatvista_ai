@@ -77,7 +77,19 @@ def lambda_handler(event, context):
     try:
         print("Received event:", json.dumps(event))
 
-        # Support both direct invocation and API Gateway (via POST body)
+        # ✅ Handle CORS preflight
+        if event.get("httpMethod") == "OPTIONS":
+            return {
+                "statusCode": 200,
+                "headers": {
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+                    "Access-Control-Allow-Methods": "OPTIONS,POST"
+                },
+                "body": json.dumps({"message": "CORS preflight success"})
+            }
+
+        # Extract the question from the body or direct call
         question = event.get("question")
         if not question and "body" in event:
             body = json.loads(event["body"])
