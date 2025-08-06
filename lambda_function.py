@@ -8,15 +8,26 @@ from langchain_community.vectorstores import FAISS
 from langchain_aws.embeddings import BedrockEmbeddings
 from langchain_core.prompts import PromptTemplate
 from langchain_aws import ChatBedrock
+from transformers import AutoTokenizer
 
-# Configs
-S3_BUCKET = "faissindexing"
-S3_KEY = "faiss_index.tar.gz"
-AWS_REGION = "eu-west-1"
+# Load config from environment variables
+S3_BUCKET = os.getenv("S3_BUCKET")
+S3_KEY = os.getenv("S3_KEY")
+AWS_REGION = os.getenv("AWS_REGION", "eu-west-1")
+LLM_MODEL_ID = os.getenv("LLM_MODEL_ID")
 
-# Bedrock model IDs
-EMBED_MODEL_ID = "amazon.titan-embed-text-v2:0"
-LLM_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+# Prompt template from environment
+PROMPT_TEMPLATE = os.getenv("""PROMPT_TEMPLATE""")
+
+# Basic in-memory cache
+CACHE = {}
+
+# Tokenizer for token counting (logging/debugging)
+tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-1B-Instruct")
+
+def count_tokens(text):
+    tokens = tokenizer.encode(text, return_tensors="pt")
+    return tokens.shape[-1]
 
 def download_and_extract_faiss():
     s3 = boto3.client("s3", region_name=AWS_REGION)
@@ -45,25 +56,13 @@ def load_vectorstore():
     temp_dir = download_and_extract_faiss()
     embeddings = BedrockEmbeddings(
         client=boto3.client("bedrock-runtime", region_name=AWS_REGION),
-        model_id=EMBED_MODEL_ID
+        model_id=None  # Not needed as vectors are precomputed
     )
     return FAISS.load_local(temp_dir, embeddings, allow_dangerous_deserialization=True)
 
 def build_prompt(docs, question):
-    template = """You are a concise and helpful assistant.
-- Answer briefly and clearly using no more than 2 short paragraphs.
-- Avoid repetition or over-explaining.
-- If the user says greetings like "hi", "hello", "hey", simply respond with "Hello! How can I help you today?"
-. Use the following context to answer the question.
-
-Context:
-{context}
-
-Question: {question}
-
-Answer:"""
     context_text = "\n\n".join(doc.page_content for doc in docs)
-    prompt = PromptTemplate.from_template(template)
+    prompt = PromptTemplate.from_template(PROMPT_TEMPLATE)
     return prompt.format(context=context_text, question=question)
 
 def call_llm(prompt):
@@ -77,7 +76,7 @@ def lambda_handler(event, context):
     try:
         print("Received event:", json.dumps(event))
 
-        # ✅ Handle CORS preflight
+        # Handle preflight CORS
         if event.get("httpMethod") == "OPTIONS":
             return {
                 "statusCode": 200,
@@ -89,7 +88,7 @@ def lambda_handler(event, context):
                 "body": json.dumps({"message": "CORS preflight success"})
             }
 
-        # Extract the question from the body or direct call
+        # Extract the question from body
         question = event.get("question")
         if not question and "body" in event:
             body = json.loads(event["body"])
@@ -98,16 +97,43 @@ def lambda_handler(event, context):
         if not question:
             return {
                 "statusCode": 400,
-                "headers": {
-                    "Access-Control-Allow-Origin": "*"
-                },
+                "headers": {"Access-Control-Allow-Origin": "*"},
                 "body": json.dumps({"error": "Missing 'question'"})
             }
 
+        # Check cache
+        if question in CACHE:
+            print("Cache hit")
+            cached_answer, cached_sources = CACHE[question]
+            return {
+                "statusCode": 200,
+                "headers": {
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+                    "Access-Control-Allow-Methods": "OPTIONS,POST"
+                },
+                "body": json.dumps({
+                    "answer": cached_answer,
+                    "sources": cached_sources,
+                    "cached": True
+                })
+            }
+
+        # Load vectorstore and search
         vectorstore = load_vectorstore()
         docs = vectorstore.similarity_search(question, k=4)
         prompt = build_prompt(docs, question)
+
+        print(f"Token count: {count_tokens(prompt)}")
+
+        # Invoke LLM
         llm_response = call_llm(prompt)
+
+        answer = llm_response.content
+        sources = list({doc.metadata.get("source", "unknown") for doc in docs})
+
+        # Cache result
+        CACHE[question] = (answer, sources)
 
         return {
             "statusCode": 200,
@@ -117,8 +143,9 @@ def lambda_handler(event, context):
                 "Access-Control-Allow-Methods": "OPTIONS,POST"
             },
             "body": json.dumps({
-                "answer": llm_response.content,
-                "sources": list({doc.metadata.get("source", "unknown") for doc in docs})
+                "answer": answer,
+                "sources": sources,
+                "cached": False
             })
         }
 
@@ -126,8 +153,6 @@ def lambda_handler(event, context):
         print("Error:", str(e))
         return {
             "statusCode": 500,
-            "headers": {
-                "Access-Control-Allow-Origin": "*"
-            },
+            "headers": {"Access-Control-Allow-Origin": "*"},
             "body": json.dumps({"error": str(e)})
         }
