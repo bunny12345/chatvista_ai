@@ -8,7 +8,6 @@ from langchain_community.vectorstores import FAISS
 from langchain_aws.embeddings import BedrockEmbeddings
 from langchain_core.prompts import PromptTemplate
 from langchain_aws import ChatBedrock
-from transformers import AutoTokenizer
 
 # Load config from environment variables
 S3_BUCKET = os.getenv("S3_BUCKET")
@@ -17,17 +16,10 @@ AWS_REGION = os.getenv("AWS_REGION", "eu-west-1")
 LLM_MODEL_ID = os.getenv("LLM_MODEL_ID")
 
 # Prompt template from environment
-PROMPT_TEMPLATE = os.getenv("""PROMPT_TEMPLATE""")
+PROMPT_TEMPLATE = os.getenv("PROMPT_TEMPLATE")
 
 # Basic in-memory cache
 CACHE = {}
-
-# Tokenizer for token counting (logging/debugging)
-tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-1B-Instruct")
-
-def count_tokens(text):
-    tokens = tokenizer.encode(text, return_tensors="pt")
-    return tokens.shape[-1]
 
 def download_and_extract_faiss():
     s3 = boto3.client("s3", region_name=AWS_REGION)
@@ -123,8 +115,6 @@ def lambda_handler(event, context):
         vectorstore = load_vectorstore()
         docs = vectorstore.similarity_search(question, k=4)
         prompt = build_prompt(docs, question)
-
-        print(f"Token count: {count_tokens(prompt)}")
 
         # Invoke LLM
         llm_response = call_llm(prompt)
