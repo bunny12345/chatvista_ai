@@ -16,7 +16,21 @@ AWS_REGION = os.getenv("AWS_REGION", "eu-west-1")
 LLM_MODEL_ID = os.getenv("LLM_MODEL_ID")
 
 # Prompt template from environment
-PROMPT_TEMPLATE = os.getenv("PROMPT_TEMPLATE")
+def build_prompt(docs, question):
+    template = """You are a concise and helpful assistant.
+- Answer briefly and clearly using no more than 2 short paragraphs.
+- Avoid repetition or over-explaining.
+. Use the following context to answer the question.
+
+Context:
+{context}
+
+Question: {question}
+
+Answer:"""
+    context_text = "\n\n".join(doc.page_content for doc in docs)
+    prompt = PromptTemplate.from_template(template)
+    return prompt.format(context=context_text, question=question)
 
 # Basic in-memory cache
 CACHE = {}
