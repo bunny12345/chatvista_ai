@@ -15,12 +15,14 @@ S3_KEY = os.getenv("S3_KEY")
 AWS_REGION = os.getenv("AWS_REGION", "eu-west-1")
 LLM_MODEL_ID = os.getenv("LLM_MODEL_ID")
 
-# Prompt template from environment
+# Basic in-memory cache
+CACHE = {}
+
 def build_prompt(docs, question):
     template = """You are a concise and helpful assistant.
 - Answer briefly and clearly using no more than 2 short paragraphs.
 - Avoid repetition or over-explaining.
-. Use the following context to answer the question.
+- Use the following context to answer the question.
 
 Context:
 {context}
@@ -31,9 +33,6 @@ Answer:"""
     context_text = "\n\n".join(doc.page_content for doc in docs)
     prompt = PromptTemplate.from_template(template)
     return prompt.format(context=context_text, question=question)
-
-# Basic in-memory cache
-CACHE = {}
 
 def download_and_extract_faiss():
     s3 = boto3.client("s3", region_name=AWS_REGION)
@@ -65,11 +64,6 @@ def load_vectorstore():
         model_id=None  # Not needed as vectors are precomputed
     )
     return FAISS.load_local(temp_dir, embeddings, allow_dangerous_deserialization=True)
-
-def build_prompt(docs, question):
-    context_text = "\n\n".join(doc.page_content for doc in docs)
-    prompt = PromptTemplate.from_template(PROMPT_TEMPLATE)
-    return prompt.format(context=context_text, question=question)
 
 def call_llm(prompt):
     model = ChatBedrock(
