@@ -13,7 +13,7 @@ from langchain_aws import ChatBedrock
 S3_BUCKET = "faissindexing"
 S3_KEY = "faiss_index.tar.g
 AWS_REGION = "eu-west-1"
-LLM_MODEL_ID = ""
+LLM_MODEL_ID = "meta.llama3-1b-instruct-v1:0"
 
 # Basic in-memory cache
 CACHE = {}
