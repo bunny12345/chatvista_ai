@@ -11,7 +11,7 @@ from langchain_aws import ChatBedrock
 
 # Load config from environment variables
 S3_BUCKET = "faissindexing"
-S3_KEY = "faiss_index.tar.g
+S3_KEY = "faiss_index.tar.gz"
 AWS_REGION = "eu-west-1"
 LLM_MODEL_ID = "meta.llama3-1b-instruct-v1:0"
 
