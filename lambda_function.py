@@ -14,7 +14,7 @@ S3_BUCKET = os.getenv("S3_BUCKET")
 S3_KEY = os.getenv("S3_KEY")
 AWS_REGION = os.getenv("AWS_REGION", "eu-west-1")
 LLM_MODEL_ID = os.getenv("LLM_MODEL_ID")
-
+EMBED_MODEL_ID = "amazon.titan-embed-text-v3:0"
 # Basic in-memory cache
 CACHE = {}
 
@@ -61,7 +61,7 @@ def load_vectorstore():
     temp_dir = download_and_extract_faiss()
     embeddings = BedrockEmbeddings(
         client=boto3.client("bedrock-runtime", region_name=AWS_REGION),
-        model_id=None  # Not needed as vectors are precomputed
+        model_id=EMBED_MODEL_ID  # Not needed as vectors are precomputed
     )
     return FAISS.load_local(temp_dir, embeddings, allow_dangerous_deserialization=True)
 
