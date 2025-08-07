@@ -16,7 +16,7 @@ AWS_REGION = "eu-west-1"
 
 # Bedrock model IDs
 EMBED_MODEL_ID = "amazon.titan-embed-text-v3:0"
-LLM_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+LLM_MODEL_ID = "meta.llama3-1b-instruct-v1:0"
 
 # Simple in-memory cache: { question: (answer, sources) }
 CACHE = {}
