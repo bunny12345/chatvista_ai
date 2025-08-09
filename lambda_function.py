@@ -7,7 +7,6 @@ import boto3
 from langchain_community.vectorstores import FAISS
 from langchain_aws.embeddings import BedrockEmbeddings
 from langchain_core.prompts import PromptTemplate
-from langchain_aws import ChatBedrock
 
 # Configs
 S3_BUCKET = "faissindexing"
@@ -16,7 +15,10 @@ AWS_REGION = "eu-west-1"
 
 # Bedrock model IDs
 EMBED_MODEL_ID = "amazon.titan-embed-text-v2:0"
-LLM_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+LLM_INFERENCE_PROFILE_ARN = "arn:aws:bedrock:eu-west-1:931886962745:inference-profile/eu.meta.llama3-2-1b-instruct-v1:0"
+
+# Simple in-memory cache dictionary
+CACHE = {}
 
 def download_and_extract_faiss():
     s3 = boto3.client("s3", region_name=AWS_REGION)
@@ -53,8 +55,7 @@ def build_prompt(docs, question):
     template = """You are a concise and helpful assistant.
 - Answer briefly and clearly using no more than 2 short paragraphs.
 - Avoid repetition or over-explaining.
-- If the user says greetings like "hi", "hello", "hey", simply respond with "Hello! How can I help you today?"
-. Use the following context to answer the question.
+Use the following context to answer the question.
 
 Context:
 {context}
@@ -67,29 +68,39 @@ Answer:"""
     return prompt.format(context=context_text, question=question)
 
 def call_llm(prompt):
-    model = ChatBedrock(
-        model_id=LLM_MODEL_ID,
-        client=boto3.client("bedrock-runtime", region_name=AWS_REGION)
-    )
-    return model.invoke(prompt)
+    client = boto3.client("bedrock-runtime", region_name=AWS_REGION)
+    payload = {"prompt": prompt}
 
-def lambda_handler(event, context):
+    response = client.invoke_model(
+        modelId=LLM_INFERENCE_PROFILE_ARN,
+        contentType="application/json",
+        accept="application/json",
+        body=json.dumps(payload).encode("utf-8")
+    )
+    output = response["body"].read().decode()
+
+    try:
+        parsed = json.loads(output)
+        return parsed.get("generation", output)  # return generated text or raw output
+    except json.JSONDecodeError:
+        return output
+
+def lambda_handler_2(event, context):
     try:
         print("Received event:", json.dumps(event))
 
-        # ✅ Handle CORS preflight
+        # Handle CORS preflight
         if event.get("httpMethod") == "OPTIONS":
             return {
                 "statusCode": 200,
                 "headers": {
                     "Access-Control-Allow-Origin": "*",
                     "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                    "Access-Control-Allow-Methods": "OPTIONS,POST"
+                    "Access-Control-Allow-Methods": "OPTIONS,POST",
                 },
-                "body": json.dumps({"message": "CORS preflight success"})
+                "body": json.dumps({"message": "CORS preflight success"}),
             }
 
-        # Extract the question from the body or direct call
         question = event.get("question")
         if not question and "body" in event:
             body = json.loads(event["body"])
@@ -98,10 +109,22 @@ def lambda_handler(event, context):
         if not question:
             return {
                 "statusCode": 400,
+                "headers": {"Access-Control-Allow-Origin": "*"},
+                "body": json.dumps({"error": "Missing 'question'"}),
+            }
+
+        # Check cache for repeated questions
+        if question in CACHE:
+            print("Returning cached answer")
+            cached_response = CACHE[question]
+            return {
+                "statusCode": 200,
                 "headers": {
-                    "Access-Control-Allow-Origin": "*"
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+                    "Access-Control-Allow-Methods": "OPTIONS,POST",
                 },
-                "body": json.dumps({"error": "Missing 'question'"})
+                "body": json.dumps(cached_response),
             }
 
         vectorstore = load_vectorstore()
@@ -109,25 +132,28 @@ def lambda_handler(event, context):
         prompt = build_prompt(docs, question)
         llm_response = call_llm(prompt)
 
+        response_body = {
+            "answer": llm_response,
+            "sources": list({doc.metadata.get("source", "unknown") for doc in docs}),
+        }
+
+        # Cache the response for future identical requests
+        CACHE[question] = response_body
+
         return {
             "statusCode": 200,
             "headers": {
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                "Access-Control-Allow-Methods": "OPTIONS,POST"
+                "Access-Control-Allow-Methods": "OPTIONS,POST",
             },
-            "body": json.dumps({
-                "answer": llm_response.content,
-                "sources": list({doc.metadata.get("source", "unknown") for doc in docs})
-            })
+            "body": json.dumps(response_body),
         }
 
     except Exception as e:
         print("Error:", str(e))
         return {
             "statusCode": 500,
-            "headers": {
-                "Access-Control-Allow-Origin": "*"
-            },
-            "body": json.dumps({"error": str(e)})
+            "headers": {"Access-Control-Allow-Origin": "*"},
+            "body": json.dumps({"error": str(e)}),
         }
