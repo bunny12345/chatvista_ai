@@ -15,7 +15,7 @@ S3_KEY = "faiss_index.tar.gz"
 AWS_REGION = "eu-west-1"
 
 # Bedrock model IDs
-EMBED_MODEL_ID = "amazon.titan-embed-text-v3:0"
+EMBED_MODEL_ID = "amazon.titan-embed-text-v2:0"
 LLM_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
 
 def download_and_extract_faiss():
