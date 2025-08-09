@@ -9,7 +9,7 @@ from langchain_aws.embeddings import BedrockEmbeddings
 from langchain_core.prompts import PromptTemplate
 
 # Configs
-S3_BUCKET = "faissindexing"
+S3_BUCKET = "faissindexingirlcollege"
 S3_KEY = "faiss_index.tar.gz"
 AWS_REGION = "eu-west-1"
 
@@ -85,7 +85,7 @@ def call_llm(prompt):
     except json.JSONDecodeError:
         return output
 
-def lambda_handler_3(event, context):
+def lambda_handler(event, context):
     try:
         print("Received event:", json.dumps(event))
 
