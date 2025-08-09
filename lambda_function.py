@@ -85,7 +85,7 @@ def call_llm(prompt):
     except json.JSONDecodeError:
         return output
 
-def lambda_handler_2(event, context):
+def lambda_handler(event, context):
     try:
         print("Received event:", json.dumps(event))
 
