@@ -1,5 +1,0 @@
-- name: Build Docker image
-  hosts: localhost
-  tasks:
-    - name: Build image
-      command: docker build -t my-lambda-function .

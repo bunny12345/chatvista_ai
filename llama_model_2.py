@@ -53,7 +53,7 @@ def load_vectorstore():
 
 def build_prompt(docs, question):
     template = """You are a concise and helpful assistant.
-- Answer briefly and clearly using no more than 2 short paragraphs no more then 300 tokens.
+- Answer briefly and clearly using no more than 2 short paragraphs.
 - Avoid repetition or over-explaining.
 Use the following context to answer the question.
 
@@ -85,7 +85,7 @@ def call_llm(prompt):
     except json.JSONDecodeError:
         return output
 
-def lambda_handler(event, context):
+def lambda_handler_3(event, context):
     try:
         print("Received event:", json.dumps(event))
 

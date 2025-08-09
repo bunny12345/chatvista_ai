@@ -15,7 +15,7 @@ AWS_REGION = "eu-west-1"
 
 # Bedrock model IDs
 EMBED_MODEL_ID = "amazon.titan-embed-text-v2:0"
-LLM_INFERENCE_PROFILE_ARN = "arn:aws:bedrock:eu-west-1:931886962745:inference-profile/eu.meta.llama3-2-3b-instruct-v1:0"
+LLM_INFERENCE_PROFILE_ARN = "arn:aws:bedrock:eu-west-1:931886962745:inference-profile/eu.meta.llama3-2-1b-instruct-v1:0"
 
 # Simple in-memory cache dictionary
 CACHE = {}
@@ -53,7 +53,7 @@ def load_vectorstore():
 
 def build_prompt(docs, question):
     template = """You are a concise and helpful assistant.
-- Answer briefly and clearly using no more than 2 short paragraphs no more then 300 tokens.
+- Answer briefly and clearly using no more than 2 short paragraphs.
 - Avoid repetition or over-explaining.
 Use the following context to answer the question.
 
