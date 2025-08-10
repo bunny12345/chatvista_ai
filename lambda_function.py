@@ -3,6 +3,7 @@ import io
 import json
 import tarfile
 import tempfile
+import re
 import boto3
 from langchain_community.vectorstores import FAISS
 from langchain_aws.embeddings import BedrockEmbeddings
@@ -53,9 +54,10 @@ def load_vectorstore():
 
 def build_prompt(docs, question):
     template = """You are a concise and helpful assistant.
-- Answer briefly and clearly using no more than 2 short paragraphs no more then 300 tokens.
-- Avoid repetition or over-explaining.
-Use the following context to answer the question.
+- Respond in no more than 2 short paragraphs and 300 tokens total.
+- Avoid repetition, unnecessary politeness, or extra closing remarks.
+- Do not include phrases like 'Let me know if you need more help' or 'Best regards'.
+- Provide only the factual answer using the given context.
 
 Context:
 {context}
@@ -66,6 +68,20 @@ Answer:"""
     context_text = "\n\n".join(doc.page_content for doc in docs)
     prompt = PromptTemplate.from_template(template)
     return prompt.format(context=context_text, question=question)
+
+def clean_response(text):
+    # Remove repeated polite endings or filler lines
+    patterns_to_remove = [
+        r"(Let me know.*?)(\n|$)",
+        r"(Please let me know.*?)(\n|$)",
+        r"(I am here to help.*?)(\n|$)",
+        r"(Best regards,.*?)(\n|$)",
+    ]
+    for pattern in patterns_to_remove:
+        text = re.sub(pattern, "", text, flags=re.IGNORECASE)
+    # Collapse excessive blank lines
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    return text
 
 def call_llm(prompt):
     client = boto3.client("bedrock-runtime", region_name=AWS_REGION)
@@ -81,9 +97,11 @@ def call_llm(prompt):
 
     try:
         parsed = json.loads(output)
-        return parsed.get("generation", output)  # return generated text or raw output
+        raw_text = parsed.get("generation", output)
     except json.JSONDecodeError:
-        return output
+        raw_text = output
+
+    return clean_response(raw_text)
 
 def lambda_handler(event, context):
     try:
