@@ -20,12 +20,27 @@ LLM_INFERENCE_PROFILE_ARN = "arn:aws:bedrock:eu-west-1:931886962745:inference-pr
 
 # Simple in-memory cache dictionary
 CACHE = {}
+VECTORSTORE = None  # Global cache for FAISS index
+
+# Common CORS headers
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+    "Access-Control-Allow-Methods": "OPTIONS,POST"
+}
 
 def download_and_extract_faiss():
+    """Download FAISS index from S3 and extract to /tmp for reuse."""
+    local_dir = "/tmp/faiss_index"
+    if os.path.exists(os.path.join(local_dir, "index.faiss")):
+        print("Using cached FAISS index from /tmp")
+        return local_dir
+
+    print("Downloading FAISS index from S3...")
     s3 = boto3.client("s3", region_name=AWS_REGION)
     response = s3.get_object(Bucket=S3_BUCKET, Key=S3_KEY)
 
-    temp_dir = tempfile.mkdtemp()
+    os.makedirs(local_dir, exist_ok=True)
     tar_data = io.BytesIO(response["Body"].read())
 
     with tarfile.open(fileobj=tar_data, mode="r:gz") as tar:
@@ -36,28 +51,38 @@ def download_and_extract_faiss():
             if member.isfile():
                 if in_subdir and member.name.startswith("faiss_index/"):
                     member.name = member.name[len("faiss_index/"):]
-                tar.extract(member, path=temp_dir)
+                tar.extract(member, path=local_dir)
 
     for file_name in ["index.faiss", "index.pkl"]:
-        if not os.path.exists(os.path.join(temp_dir, file_name)):
+        if not os.path.exists(os.path.join(local_dir, file_name)):
             raise FileNotFoundError(f"Missing expected file: {file_name}")
 
-    return temp_dir
+    return local_dir
 
 def load_vectorstore():
-    temp_dir = download_and_extract_faiss()
+    """Load FAISS index into memory (cached globally for Lambda warm starts)."""
+    global VECTORSTORE
+    if VECTORSTORE:
+        print("Using in-memory cached FAISS vectorstore")
+        return VECTORSTORE
+
     embeddings = BedrockEmbeddings(
         client=boto3.client("bedrock-runtime", region_name=AWS_REGION),
         model_id=EMBED_MODEL_ID
     )
-    return FAISS.load_local(temp_dir, embeddings, allow_dangerous_deserialization=True)
+    VECTORSTORE = FAISS.load_local(
+        download_and_extract_faiss(),
+        embeddings,
+        allow_dangerous_deserialization=True
+    )
+    return VECTORSTORE
 
 def build_prompt(docs, question):
+    """Build a short, token-limited prompt."""
     template = """You are a concise and helpful assistant.
-- Respond in no more than 2 short paragraphs and 300 tokens total.
-- Avoid repetition, unnecessary politeness, or extra closing remarks.
-- Do not include phrases like 'Let me know if you need more help' or 'Best regards'.
-- Provide only the factual answer using the given context.
+- Limit your response to 300 tokens maximum.
+- Avoid repetition, unnecessary politeness, or extra remarks.
+- Only answer using the provided context.
 
 Context:
 {context}
@@ -70,7 +95,7 @@ Answer:"""
     return prompt.format(context=context_text, question=question)
 
 def clean_response(text):
-    # Remove repeated polite endings or filler lines
+    """Remove filler and closing phrases."""
     patterns_to_remove = [
         r"(Let me know.*?)(\n|$)",
         r"(Please let me know.*?)(\n|$)",
@@ -79,11 +104,11 @@ def clean_response(text):
     ]
     for pattern in patterns_to_remove:
         text = re.sub(pattern, "", text, flags=re.IGNORECASE)
-    # Collapse excessive blank lines
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     return text
 
 def call_llm(prompt):
+    """Call Bedrock LLM."""
     client = boto3.client("bedrock-runtime", region_name=AWS_REGION)
     payload = {"prompt": prompt}
 
@@ -109,45 +134,28 @@ def lambda_handler(event, context):
 
         # Handle CORS preflight
         if event.get("httpMethod") == "OPTIONS":
-            return {
-                "statusCode": 200,
-                "headers": {
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                    "Access-Control-Allow-Methods": "OPTIONS,POST",
-                },
-                "body": json.dumps({"message": "CORS preflight success"}),
-            }
+            return {"statusCode": 200, "headers": CORS_HEADERS, "body": json.dumps({"message": "CORS preflight success"})}
 
+        # Extract question
         question = event.get("question")
         if not question and "body" in event:
             body = json.loads(event["body"])
             question = body.get("question")
 
         if not question:
-            return {
-                "statusCode": 400,
-                "headers": {"Access-Control-Allow-Origin": "*"},
-                "body": json.dumps({"error": "Missing 'question'"}),
-            }
+            return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Missing 'question'"})}
 
-        # Check cache for repeated questions
+        # Return cached response if exists
         if question in CACHE:
             print("Returning cached answer")
-            cached_response = CACHE[question]
-            return {
-                "statusCode": 200,
-                "headers": {
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                    "Access-Control-Allow-Methods": "OPTIONS,POST",
-                },
-                "body": json.dumps(cached_response),
-            }
+            return {"statusCode": 200, "headers": CORS_HEADERS, "body": json.dumps(CACHE[question])}
 
+        # Load vectorstore and search
         vectorstore = load_vectorstore()
-        docs = vectorstore.similarity_search(question, k=4)
+        docs = vectorstore.similarity_search(question, k=2)  # Reduced for speed
         prompt = build_prompt(docs, question)
+
+        # Call LLM
         llm_response = call_llm(prompt)
 
         response_body = {
@@ -155,23 +163,11 @@ def lambda_handler(event, context):
             "sources": list({doc.metadata.get("source", "unknown") for doc in docs}),
         }
 
-        # Cache the response for future identical requests
+        # Cache response
         CACHE[question] = response_body
 
-        return {
-            "statusCode": 200,
-            "headers": {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                "Access-Control-Allow-Methods": "OPTIONS,POST",
-            },
-            "body": json.dumps(response_body),
-        }
+        return {"statusCode": 200, "headers": CORS_HEADERS, "body": json.dumps(response_body)}
 
     except Exception as e:
         print("Error:", str(e))
-        return {
-            "statusCode": 500,
-            "headers": {"Access-Control-Allow-Origin": "*"},
-            "body": json.dumps({"error": str(e)}),
-        }
+        return {"statusCode": 500, "headers": CORS_HEADERS, "body": json.dumps({"error": str(e)})}
