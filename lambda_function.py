@@ -2,7 +2,6 @@ import os
 import io
 import json
 import tarfile
-import tempfile
 import re
 import boto3
 from langchain_community.vectorstores import FAISS
@@ -32,7 +31,7 @@ CORS_HEADERS = {
 def download_and_extract_faiss():
     """Download FAISS index from S3 and extract to /tmp for reuse."""
     local_dir = "/tmp/faiss_index"
-    if os.path.exists(os.path.join(local_dir, "index.faiss")):
+    if os.path.exists(os.path.join(local_dir, "index.faiss")) and os.path.exists(os.path.join(local_dir, "index.pkl")):
         print("Using cached FAISS index from /tmp")
         return local_dir
 
@@ -46,7 +45,6 @@ def download_and_extract_faiss():
     with tarfile.open(fileobj=tar_data, mode="r:gz") as tar:
         members = tar.getmembers()
         in_subdir = any(m.name.startswith("faiss_index/") for m in members if m.isfile())
-
         for member in members:
             if member.isfile():
                 if in_subdir and member.name.startswith("faiss_index/"):
@@ -108,9 +106,12 @@ def clean_response(text):
     return text
 
 def call_llm(prompt):
-    """Call Bedrock LLM."""
+    """Call Bedrock LLM with token limit."""
     client = boto3.client("bedrock-runtime", region_name=AWS_REGION)
-    payload = {"prompt": prompt}
+    payload = {
+        "prompt": prompt,
+        "max_gen_len": 300  # Correct param for Llama models in Bedrock
+    }
 
     response = client.invoke_model(
         modelId=LLM_INFERENCE_PROFILE_ARN,
@@ -170,4 +171,15 @@ def lambda_handler(event, context):
 
     except Exception as e:
         print("Error:", str(e))
-        return {"statusCode": 500, "headers": CORS_HEADERS, "body": json.dumps({"error": str(e)})}
+        return {
+            "statusCode": 500,
+            "headers": CORS_HEADERS,
+            "body": json.dumps({"error": str(e)})
+        }
+
+if __name__ == "__main__":
+    # For local testing
+    test_event = {
+        "question": "do we get any scholarships in Trinity college?"
+    }
+    print(lambda_handler(test_event, None))
