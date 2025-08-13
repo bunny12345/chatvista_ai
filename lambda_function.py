@@ -81,18 +81,18 @@ def lambda_handler(event, context):
         print("Received event:", json.dumps(event))
 
         # Handle CORS preflight
-        if event.get("httpMethod") == "OPTIONS":
-            return {
-                "statusCode": 200,
-                "headers": {
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-                    "Access-Control-Allow-Methods": "OPTIONS,POST"
-                },
-                "body": json.dumps({"message": "CORS preflight success"})
-            }
+        # if event.get("httpMethod") == "OPTIONS":
+        #     return {
+        #         "statusCode": 200,
+        #         "headers": {
+        #             "Access-Control-Allow-Origin": "*",
+        #             "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
+        #             "Access-Control-Allow-Methods": "OPTIONS,POST"
+        #         },
+        #         "body": json.dumps({"message": "CORS preflight success"})
+        #     }
 
-        question = event.get("question")
+        # question = event.get("question")
         if not question and "body" in event:
             body = json.loads(event["body"])
             question = body.get("question")
