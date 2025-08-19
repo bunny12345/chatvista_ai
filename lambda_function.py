@@ -92,7 +92,7 @@ def lambda_handler(event, context):
                 "body": json.dumps({"message": "CORS preflight success"})
             }
 
-        # question = event.get("question")
+        question = event.get("question")
         if not question and "body" in event:
             body = json.loads(event["body"])
             question = body.get("question")
