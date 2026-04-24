@@ -3,6 +3,7 @@ import io
 import json
 import tarfile
 import tempfile
+import shutil
 import boto3
 from langchain_community.vectorstores import FAISS
 from langchain_aws.embeddings import BedrockEmbeddings
@@ -13,6 +14,7 @@ from langchain_aws import ChatBedrock
 S3_BUCKET = "faissindexingirlcollege"
 S3_KEY = "faiss_index.tar.gz"
 AWS_REGION = "eu-west-1"
+INDEX_DIR = "/tmp/faiss_index"
 
 # Bedrock model IDs
 EMBED_MODEL_ID = "amazon.titan-embed-text-v2:0"
@@ -20,12 +22,19 @@ LLM_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
 
 # Simple in-memory cache for question -> answer
 CACHE = {}
+VECTORSTORE = None
 
 def download_and_extract_faiss():
+    if os.path.exists(os.path.join(INDEX_DIR, "index.faiss")) and os.path.exists(os.path.join(INDEX_DIR, "index.pkl")):
+        return INDEX_DIR
+
+    if os.path.exists(INDEX_DIR):
+        shutil.rmtree(INDEX_DIR)
+    os.makedirs(INDEX_DIR, exist_ok=True)
+
     s3 = boto3.client("s3", region_name=AWS_REGION)
     response = s3.get_object(Bucket=S3_BUCKET, Key=S3_KEY)
 
-    temp_dir = tempfile.mkdtemp()
     tar_data = io.BytesIO(response["Body"].read())
 
     with tarfile.open(fileobj=tar_data, mode="r:gz") as tar:
@@ -36,21 +45,26 @@ def download_and_extract_faiss():
             if member.isfile():
                 if in_subdir and member.name.startswith("faiss_index/"):
                     member.name = member.name[len("faiss_index/"):]
-                tar.extract(member, path=temp_dir)
+                tar.extract(member, path=INDEX_DIR)
 
     for file_name in ["index.faiss", "index.pkl"]:
-        if not os.path.exists(os.path.join(temp_dir, file_name)):
+        if not os.path.exists(os.path.join(INDEX_DIR, file_name)):
             raise FileNotFoundError(f"Missing expected file: {file_name}")
 
-    return temp_dir
+    return INDEX_DIR
 
 def load_vectorstore():
+    global VECTORSTORE
+    if VECTORSTORE is not None:
+        return VECTORSTORE
+
     temp_dir = download_and_extract_faiss()
     embeddings = BedrockEmbeddings(
         client=boto3.client("bedrock-runtime", region_name=AWS_REGION),
         model_id=EMBED_MODEL_ID
     )
-    return FAISS.load_local(temp_dir, embeddings, allow_dangerous_deserialization=True)
+    VECTORSTORE = FAISS.load_local(temp_dir, embeddings, allow_dangerous_deserialization=True)
+    return VECTORSTORE
 
 def build_prompt(docs, question):
     template = """You are a concise and helpful assistant.

@@ -31,11 +31,17 @@ jobs:
               sleep 10
             done
             aws lambda wait function-updated --function-name chatbot-lambda
+            aws lambda update-function-configuration \
+              --function-name chatbot-lambda \
+              --timeout 120 \
+              --memory-size 3000
           else
             echo "Function does not exist, creating Lambda..."
             aws lambda create-function \
               --function-name chatbot-lambda \
               --package-type Image \
               --code ImageUri=${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:latest \
-              --role ${{ secrets.LAMBDA_ROLE_ARN }}
+              --role ${{ secrets.LAMBDA_ROLE_ARN }} \
+              --timeout 120 \
+              --memory-size 3000
           fi
