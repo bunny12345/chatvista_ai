@@ -4,6 +4,9 @@ FROM public.ecr.aws/lambda/python:3.11
 COPY haiku_model.py .
 COPY requirements.txt .
 
+# Install build dependencies required for compiling scipy, numpy, and other packages
+RUN yum install -y gcc gcc-c++ make lapack-devel blas-devel
+
 # Install Python packages
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
