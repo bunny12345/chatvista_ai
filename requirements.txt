@@ -1,5 +1,4 @@
 boto3
-faiss-cpu==1.8.0.post1
 numpy>=2.0.0,<3.0.0
 langchain
 langchain-community
