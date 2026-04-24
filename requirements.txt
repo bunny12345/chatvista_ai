@@ -1,5 +1,6 @@
 boto3
-numpy>=2.0.0,<3.0.0
+numpy==1.26.4
+scipy==1.11.4
 langchain
 langchain-community
 langchain-aws
