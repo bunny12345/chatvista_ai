@@ -3,6 +3,7 @@ import io
 import json
 import tarfile
 import tempfile
+import traceback
 import boto3
 from langchain_community.vectorstores import FAISS
 from langchain_aws.embeddings import BedrockEmbeddings
@@ -122,11 +123,17 @@ def lambda_handler(event, context):
 
         vectorstore = load_vectorstore()
         docs = vectorstore.similarity_search(question, k=4)
+        print("Docs loaded:", len(docs))
+        print("Doc sources:", [doc.metadata.get("source", "unknown") for doc in docs])
+
         prompt = build_prompt(docs, question)
+        print("Prompt length:", len(prompt))
         llm_response = call_llm(prompt)
+        print("LLM response type:", type(llm_response))
+        print("LLM response repr:", repr(llm_response)[:1000])
 
         response_body = {
-            "answer": llm_response.content,
+            "answer": getattr(llm_response, 'content', None),
             "sources": list({doc.metadata.get("source", "unknown") for doc in docs})
         }
 
@@ -144,9 +151,12 @@ def lambda_handler(event, context):
         }
 
     except Exception as e:
-        print("Error:", str(e))
+        error_message = str(e) or repr(e)
+        print("Error type:", type(e).__name__)
+        print("Error message:", error_message)
+        traceback.print_exc()
         return {
             "statusCode": 500,
             "headers": {"Access-Control-Allow-Origin": "*"},
-            "body": json.dumps({"error": str(e)})
+            "body": json.dumps({"error": error_message})
         }
