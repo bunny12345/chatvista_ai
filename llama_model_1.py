@@ -14,7 +14,7 @@ S3_KEY = "faiss_index.tar.gz"
 AWS_REGION = "eu-west-1"
 
 # Bedrock model IDs
-EMBED_MODEL_ID = "amazon.titan-embed-text-v2:0"
+EMBED_MODEL_ID = "cohere.embed-v4:0"
 LLM_INFERENCE_PROFILE_ARN = "arn:aws:bedrock:eu-west-1:931886962745:inference-profile/eu.meta.llama3-2-1b-instruct-v1:0"
 
 # Simple in-memory cache dictionary
@@ -47,7 +47,8 @@ def load_vectorstore():
     temp_dir = download_and_extract_faiss()
     embeddings = BedrockEmbeddings(
         client=boto3.client("bedrock-runtime", region_name=AWS_REGION),
-        model_id=EMBED_MODEL_ID
+        model_id=EMBED_MODEL_ID,
+        provider="cohere"
     )
     return FAISS.load_local(temp_dir, embeddings, allow_dangerous_deserialization=True)
 

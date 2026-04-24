@@ -15,10 +15,11 @@ def load_documents():
     return loader.load()
 
 def create_embedder():
-    print("🔹 Creating Titan embedder...")
+    print("🔹 Creating Cohere embedder...")
     return BedrockEmbeddings(
-        model_id="amazon.titan-embed-text-v2:0",
-        region_name="eu-west-1"
+        model_id="cohere.embed-v4:0",
+        region_name="eu-west-1",
+        provider="cohere"
     )
 
 def build_vector_store(docs, embedder):
