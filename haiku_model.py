@@ -18,7 +18,7 @@ INDEX_DIR = "/tmp/faiss_index"
 
 # Bedrock model IDs
 EMBED_MODEL_ID = "amazon.titan-embed-text-v2:0"
-LLM_MODEL_ID = "anthropic.claude-haiku-4-5-20251001-v1:0"
+LLM_MODEL_ID = "arn:aws:bedrock:eu-west-1:931886962745:inference-profile/eu.anthropic.claude-3-haiku-20240307-v1:0"
 
 # Simple in-memory cache for question -> answer
 CACHE = {}
