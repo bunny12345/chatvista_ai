@@ -16,12 +16,26 @@ jobs:
 
       - name: Deploy or update Lambda
         run: |
-          aws lambda create-function \
-            --function-name chatbot-lambda \
-            --package-type Image \
-            --code ImageUri=${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:latest \
-            --role ${{ secrets.LAMBDA_ROLE_ARN }} \
-            || \
-          aws lambda update-function-code \
-            --function-name chatbot-lambda \
-            --image-uri ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:latest
+          if aws lambda get-function --function-name chatbot-lambda >/dev/null 2>&1; then
+            echo "Function exists, updating Lambda image..."
+            retries=12
+            until aws lambda update-function-code \
+              --function-name chatbot-lambda \
+              --image-uri ${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:latest; do
+              if [ "$retries" -le 0 ]; then
+                echo "Update failed after retries."
+                exit 1
+              fi
+              echo "Update in progress or locked, retrying in 10 seconds..."
+              retries=$((retries - 1))
+              sleep 10
+            done
+            aws lambda wait function-updated --function-name chatbot-lambda
+          else
+            echo "Function does not exist, creating Lambda..."
+            aws lambda create-function \
+              --function-name chatbot-lambda \
+              --package-type Image \
+              --code ImageUri=${{ secrets.ECR_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPO_NAME }}:latest \
+              --role ${{ secrets.LAMBDA_ROLE_ARN }}
+          fi
