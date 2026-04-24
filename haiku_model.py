@@ -86,7 +86,8 @@ Answer:"""
 def call_llm(prompt):
     model = ChatBedrock(
         model_id=LLM_MODEL_ID,
-        client=boto3.client("bedrock-runtime", region_name=AWS_REGION)
+        client=boto3.client("bedrock-runtime", region_name=AWS_REGION),
+        provider="anthropic"
     )
     return model.invoke(prompt)
 
