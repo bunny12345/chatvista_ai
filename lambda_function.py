@@ -46,13 +46,38 @@ def download_and_extract_faiss():
     return temp_dir
 
 def load_vectorstore():
-    temp_dir = download_and_extract_faiss()
-    embeddings = BedrockEmbeddings(
-        client=boto3.client("bedrock-runtime", region_name=AWS_REGION),
-        model_id=EMBED_MODEL_ID,
-        provider="cohere"
-    )
-    return FAISS.load_local(temp_dir, embeddings, allow_dangerous_deserialization=True)
+    print("Loading vectorstore from S3...")
+    try:
+        temp_dir = download_and_extract_faiss()
+        print("FAISS files extracted to:", temp_dir)
+        print("Files in temp_dir:", os.listdir(temp_dir))
+    except Exception as download_error:
+        print("FAISS download/extraction failed:", str(download_error))
+        traceback.print_exc()
+        raise download_error
+
+    print("Creating embeddings...")
+    try:
+        embeddings = BedrockEmbeddings(
+            client=boto3.client("bedrock-runtime", region_name=AWS_REGION),
+            model_id=EMBED_MODEL_ID,
+            provider="cohere"
+        )
+        print("Embeddings created successfully")
+    except Exception as embed_error:
+        print("Embeddings creation failed:", str(embed_error))
+        traceback.print_exc()
+        raise embed_error
+
+    print("Loading FAISS vectorstore...")
+    try:
+        vectorstore = FAISS.load_local(temp_dir, embeddings, allow_dangerous_deserialization=True)
+        print("FAISS vectorstore loaded successfully")
+        return vectorstore
+    except Exception as faiss_error:
+        print("FAISS loading failed:", str(faiss_error))
+        traceback.print_exc()
+        raise faiss_error
 
 def build_prompt(docs, question):
     template = """You are a concise and helpful assistant.
@@ -121,16 +146,42 @@ def lambda_handler(event, context):
                 "body": json.dumps(cached_response)
             }
 
-        vectorstore = load_vectorstore()
-        docs = vectorstore.similarity_search(question, k=4)
-        print("Docs loaded:", len(docs))
-        print("Doc sources:", [doc.metadata.get("source", "unknown") for doc in docs])
+        print("About to load vectorstore...")
+        try:
+            vectorstore = load_vectorstore()
+            print("Vectorstore loaded successfully")
+        except Exception as vs_error:
+            print("Vectorstore loading failed with error:", str(vs_error))
+            print("Vectorstore error type:", type(vs_error).__name__)
+            traceback.print_exc()
+            raise vs_error
+
+        print("About to search docs...")
+        try:
+            docs = vectorstore.similarity_search(question, k=4)
+            print("Docs loaded:", len(docs))
+            print("Doc sources:", [doc.metadata.get("source", "unknown") for doc in docs])
+        except Exception as search_error:
+            print("Doc search failed with error:", str(search_error))
+            print("Search error type:", type(search_error).__name__)
+            traceback.print_exc()
+            raise search_error
 
         prompt = build_prompt(docs, question)
         print("Prompt length:", len(prompt))
-        llm_response = call_llm(prompt)
-        print("LLM response type:", type(llm_response))
-        print("LLM response repr:", repr(llm_response)[:1000])
+        print("Prompt preview:", prompt[:500])
+
+        print("About to call LLM...")
+        try:
+            llm_response = call_llm(prompt)
+            print("LLM call successful")
+            print("LLM response type:", type(llm_response))
+            print("LLM response repr:", repr(llm_response)[:1000])
+        except Exception as llm_error:
+            print("LLM call failed with error:", str(llm_error))
+            print("LLM error type:", type(llm_error).__name__)
+            traceback.print_exc()
+            raise llm_error
 
         response_body = {
             "answer": getattr(llm_response, 'content', None),
