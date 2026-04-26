@@ -11,7 +11,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_aws import BedrockEmbeddings
 def load_documents():
     print("🔹 Loading documents from S3...")
-    loader = S3FileLoader(bucket="irlcolleges", key="IRL_college_all_data.pdf")  # Replace these
+    loader = S3FileLoader(bucket="irlcolleges", key="SUSTAIN-EU_Module 7_Carbon Accounting and Reporting_SRC_V2 (1).pptx")  # Replace these
     return loader.load()
 
 def create_embedder():
