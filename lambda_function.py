@@ -73,6 +73,7 @@ def load_vectorstore():
     try:
         vectorstore = FAISS.load_local(temp_dir, embeddings, allow_dangerous_deserialization=True)
         print("FAISS vectorstore loaded successfully")
+        print("FAISS index dimension:", vectorstore.index.d)
         return vectorstore
     except Exception as faiss_error:
         print("FAISS loading failed:", str(faiss_error))
@@ -158,6 +159,15 @@ def lambda_handler(event, context):
 
         print("About to search docs...")
         try:
+            if hasattr(vectorstore, 'embeddings'):
+                query_vec = vectorstore.embeddings.embed_query(question)
+                print("Query embedding length:", len(query_vec))
+                print("FAISS index dimension:", vectorstore.index.d)
+                if len(query_vec) != vectorstore.index.d:
+                    raise ValueError(
+                        f"Embedding dimension mismatch: query vector length {len(query_vec)} does not match FAISS index dimension {vectorstore.index.d}. "
+                        "Rebuild your FAISS index with the same embedding model/version."
+                    )
             docs = vectorstore.similarity_search(question, k=4)
             print("Docs loaded:", len(docs))
             print("Doc sources:", [doc.metadata.get("source", "unknown") for doc in docs])
@@ -211,3 +221,19 @@ def lambda_handler(event, context):
             "headers": {"Access-Control-Allow-Origin": "*"},
             "body": json.dumps({"error": error_message})
         }
+
+if __name__ == "__main__":
+    print("Test started")
+    # Test event for local execution
+    test_event = {
+        "body": json.dumps({"question": "What is the capital of France?"}),
+        "headers": {"Content-Type": "application/json"}
+    }
+    test_context = None  # Mock context if needed
+    print("Before handler")
+    try:
+        result = lambda_handler(test_event, test_context)
+        print("Test result:", result)
+    except Exception as e:
+        print("Test failed:", str(e))
+        traceback.print_exc()
