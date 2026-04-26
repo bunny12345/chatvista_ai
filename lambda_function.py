@@ -17,7 +17,7 @@ AWS_REGION = "eu-west-1"
 
 # Bedrock model IDs
 EMBED_MODEL_ID = "cohere.embed-v4:0"
-LLM_MODEL_ID = "arn:aws:bedrock:eu-west-1:931886962745:inference-profile/eu.anthropic.claude-3-haiku-20240307-v1:0"
+LLM_MODEL_ID = "anthropic.claude-3-5-haiku-20241022-v1:0"
 
 # Simple in-memory cache for question -> answer
 CACHE = {}
