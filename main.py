@@ -2,12 +2,9 @@ import boto3
 import os
 import faiss
 from dotenv import load_dotenv
-from langchain.text_splitter import CharacterTextSplitter
+from langchain_community.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import BedrockEmbeddings
-from langchain_community.document_loaders import S3DirectoryLoader
 from langchain_community.document_loaders import S3FileLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_aws import BedrockEmbeddings
 def load_documents():
     print("🔹 Loading documents from S3...")
