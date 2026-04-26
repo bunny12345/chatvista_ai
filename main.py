@@ -2,7 +2,7 @@ import boto3
 import os
 import faiss
 from dotenv import load_dotenv
-from langchain_community.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import S3FileLoader
 from langchain_aws import BedrockEmbeddings
