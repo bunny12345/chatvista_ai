@@ -2,23 +2,21 @@ import boto3
 import os
 import faiss
 from dotenv import load_dotenv
-from langchain.text_splitter import CharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import BedrockEmbeddings
-from langchain_community.document_loaders import S3DirectoryLoader
 from langchain_community.document_loaders import S3FileLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_aws import BedrockEmbeddings
 def load_documents():
     print("🔹 Loading documents from S3...")
-    loader = S3FileLoader(bucket="irlcolleges", key="IRL_college_all_data.pdf")  # Replace these
+    loader = S3FileLoader(bucket="irlcolleges", key="SUSTAIN-EU_Module 7_Carbon Accounting and Reporting_SRC_V2 (1).pdf")  # Replace these
     return loader.load()
 
 def create_embedder():
-    print("🔹 Creating Titan embedder...")
+    print("🔹 Creating Cohere embedder...")
     return BedrockEmbeddings(
-        model_id="amazon.titan-embed-text-v2:0",
-        region_name="eu-west-1"
+        model_id="cohere.embed-v4:0",
+        region_name="eu-west-1",
+        provider="cohere"
     )
 
 def build_vector_store(docs, embedder):
