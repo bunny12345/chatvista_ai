@@ -137,4 +137,5 @@ jobs:
           fi
 
       - name: Output API endpoint
-        run: echo "Chatbot API endpoint: ${{ needs.infra.outputs.api_endpoint }}"
+        run: |
+          echo "Chatbot API endpoint: ${{ needs.infra.outputs.api_endpoint }}"
