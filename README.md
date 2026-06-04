@@ -17,7 +17,13 @@ chatvista_ai/
 ├── main.py                     # FAISS index builder
 ├── requirements.txt            # Python dependencies
 ├── Dockerfile                  # Container setup
+├── terraform/                  # Infrastructure automation
+│   ├── provider.tf
+│   ├── variables.tf
+│   ├── main.tf
+│   └── outputs.tf
 ├── .github/workflows/
+│   ├── 00_full_deploy.yml      # Full automation pipeline
 │   ├── 01_faiss_index.yml      # Build FAISS index
 │   ├── 04_push_to_ecr.yml      # Push to ECR
 │   └── 05_lambda_deploy.yml    # Deploy to Lambda
@@ -44,11 +50,14 @@ chatvista_ai/
 
 ### GitHub Actions Deployment
 
-Run workflows in this order:
+You can run the smaller workflows manually, or use the full automation workflow.
 
-1. **01_faiss_index.yml** - Builds FAISS vector index from documents
-2. **04_push_to_ecr.yml** - Builds Docker image and pushes to ECR
-3. **05_lambda_deploy.yml** - Deploys to AWS Lambda
+- **00_full_deploy.yml** - Full pipeline: build FAISS index, upload to S3, apply Terraform, build/push Docker image, and deploy Lambda.
+- **01_faiss_index.yml** - Build FAISS index only.
+- **04_push_to_ecr.yml** - Build Docker image and push to ECR.
+- **05_lambda_deploy.yml** - Deploy/update Lambda only.
+
+Use the full deployment workflow for the easiest migration and repeatable setup.
 
 ## Updating Documents for Vector Search
 
@@ -116,10 +125,13 @@ test_event = {
 Required:
 - S3 bucket: `faissindexingirlcollege` (FAISS index storage)
 - S3 bucket: `irlcolleges` (Source documents)
-- Lambda IAM role with:
-  - S3 read access
-  - Bedrock read access
 - ECR repository for Docker images
+- Lambda execution IAM role with:
+  - S3 read access
+  - Bedrock InvokeModel access
+  - CloudWatch Logs write access
+
+If you use the full Terraform automation, these resources are created by the `terraform/` configuration.
 
 ## Troubleshooting
 
@@ -142,3 +154,11 @@ Required:
 - `S3_KEY`: `faiss_index.tar.gz`
 - `EMBED_MODEL_ID`: `cohere.embed-v4:0`
 - `LLM_MODEL_ID`: `anthropic.claude-3-sonnet-20240229-v1:0`
+
+## GitHub Secrets for Full Deployment
+
+The full workflow uses these secrets:
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_REGION`
+- `FAISS_S3_BUCKET`
