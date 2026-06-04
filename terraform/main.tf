@@ -24,14 +24,14 @@ resource "aws_iam_role" "lambda_execution" {
 }
 
 resource "aws_iam_role_policy" "lambda_basic_execution" {
-  name   = "${var.project}-lambda-basic-execution"
-  role   = aws_iam_role.lambda_execution.id
+  name = "${var.project}-lambda-basic-execution"
+  role = aws_iam_role.lambda_execution.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = [
+        Effect = "Allow"
+        Action = [
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents"
@@ -49,8 +49,8 @@ resource "aws_iam_role_policy" "lambda_s3_access" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = [
+        Effect = "Allow"
+        Action = [
           "s3:GetObject",
           "s3:ListBucket"
         ]
@@ -85,8 +85,8 @@ resource "aws_iam_role_policy" "lambda_marketplace_access" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = [
+        Effect = "Allow"
+        Action = [
           "aws-marketplace:ViewSubscriptions",
           "aws-marketplace:Subscribe"
         ]
@@ -107,9 +107,9 @@ resource "aws_lambda_function" "chatbot" {
 
   environment {
     variables = {
-      S3_BUCKET     = var.s3_bucket_faiss
-      S3_KEY        = var.s3_key_faiss
-      AWS_REGION    = var.aws_region
+      S3_BUCKET      = var.s3_bucket_faiss
+      S3_KEY         = var.s3_key_faiss
+      AWS_REGION     = var.aws_region
       EMBED_MODEL_ID = var.embed_model_id
       LLM_MODEL_ID   = var.llm_model_id
     }
@@ -122,9 +122,9 @@ resource "aws_apigatewayv2_api" "chatbot_http_api" {
 }
 
 resource "aws_apigatewayv2_integration" "lambda_integration" {
-  api_id                = aws_apigatewayv2_api.chatbot_http_api.id
-  integration_type      = "AWS_PROXY"
-  integration_uri       = aws_lambda_function.chatbot.invoke_arn
+  api_id                 = aws_apigatewayv2_api.chatbot_http_api.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.chatbot.invoke_arn
   payload_format_version = "2.0"
 }
 
