@@ -109,7 +109,6 @@ resource "aws_lambda_function" "chatbot" {
     variables = {
       S3_BUCKET      = var.s3_bucket_faiss
       S3_KEY         = var.s3_key_faiss
-      AWS_REGION     = var.aws_region
       EMBED_MODEL_ID = var.embed_model_id
       LLM_MODEL_ID   = var.llm_model_id
     }
